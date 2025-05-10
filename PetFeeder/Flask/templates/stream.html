@@ -1,0 +1,76 @@
+{% extends "layout.html" %}
+
+{% block title %}
+Live Stream
+{% endblock %}
+
+{% block main %}
+  <div class="container-fluid stream-container">
+    <h1 style="padding-bottom: 20px;">Pet Cam</h1>
+
+    <div id="container-md" class="d-flex justify-content-center">
+      <img src="{{ url_for('video_feed') }}" class="img-fluid" alt="Video Feed">
+    </div>
+
+    <div class="buttons-container">
+      <form action="/feed" method="post">
+        <button class="btn btn-primary flex-btns custom-btn" type="submit" name="feed" value="button_click">Feed</button>
+      </form>
+
+      <form action="/flash_on" method="post">
+        <button class="btn btn-primary flex-btns custom-btn" type="submit" name="flash_on" value="button_click">Flash On</button>
+      </form>
+
+      <form action="/flash_off" method="post">
+        <button class="btn btn-primary flex-btns custom-btn" type="submit" name="flash_off" value="button_click">Flash Off</button>
+      </form>
+
+      <a href="/settings"><button class="btn btn-primary flex-btns custom-btn">Settings</button></a>
+
+      <!-- Nút Listen (không cần thẻ audio nữa) -->
+      <button id="listenButton" class="btn btn-primary flex-btns custom-btn">Listen</button>
+
+      <a href="/"><button class="btn btn-primary flex-btns custom-btn">Exit</button></a>
+    </div>
+  </div>
+
+  <!-- JavaScript với Web Audio API -->
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      let isListening = false;
+      let audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      let listenButton = document.getElementById("listenButton");
+      let reader;
+
+      listenButton.addEventListener("click", async function() {
+        if (!isListening) {
+          const response = await fetch("/audio_feed", { method: "GET" });
+          reader = response.body.getReader();
+          const processStream = async () => {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              // Bỏ qua 44 byte header WAV
+              const audioData = value.slice(44);
+              const buffer = audioContext.createBuffer(1, audioData.length, 8000);
+              const channelData = buffer.getChannelData(0);
+              for (let i = 0; i < audioData.length; i++) {
+                channelData[i] = (audioData[i] / 128) - 1; // Chuyển 8-bit sang [-1, 1]
+              }
+              const source = audioContext.createBufferSource();
+              source.buffer = buffer;
+              source.connect(audioContext.destination);
+              source.start();
+            }
+          };
+          processStream();
+          listenButton.textContent = "Stop Listening";
+        } else {
+          if (reader) reader.cancel(); // Dừng stream
+          listenButton.textContent = "Listen";
+        }
+        isListening = !isListening;
+      });
+    });
+  </script>
+{% endblock %}
