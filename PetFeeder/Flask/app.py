@@ -114,29 +114,15 @@ def flash_off():
     return "Invalid request"
 
 
-# @app.route('/listen', methods=['POST'])
-# def listen():
-#     if request.method == 'POST' and request.form['listen'] == 'button_click':
-#         audio_data = listen_audio()  # Gọi hàm từ helper.py
-#         if audio_data:
-#             return Response(audio_data, mimetype="audio/wav")  # Trả về âm thanh
-#     return "Invalid request"
-
-
-
-# @app.route('/listen', methods=['GET'])
-# def listen():
-#     return send_file("static/audio_output.wav", mimetype="audio/wav", as_attachment=False)
-
-@app.route('/audio_feed')
-def audio_feed():
-    def generate_audio():
-        url = "http://192.168.196.130:8080/audio_feed"
-        with requests.get(url, stream=True) as response:
-            for chunk in response.iter_content(chunk_size=128): # Giảm chunk size để giảm độ trễ
-                if chunk:
-                    yield chunk
-    return Response(generate_audio(), mimetype="audio/wav")
+# @app.route('/audio_feed')
+# def audio_feed():
+#     def generate_audio():
+#         url = "http://192.168.196.128:8081/audio_feed"
+#         with requests.get(url, stream=True) as response:
+#             for chunk in response.iter_content(chunk_size=128): # Giảm chunk size để giảm độ trễ
+#                 if chunk:
+#                     yield chunk
+#     return Response(generate_audio(), mimetype="audio/wav")
 
 
 

@@ -10,7 +10,7 @@ import numpy as np
 # import wave
 
 # Set Cam IP address
-cam_ip = '192.168.196.130:8080'
+cam_ip = '192.168.1.46:8080'
 
 # Connect python to cam webserver
 def cam_connect():
@@ -77,7 +77,7 @@ def generate_frames(delay, pet_id, accuracy, auto_feed, portion):
   # global timer_thread
 
   # Load video stream from ESP32 cam
-  url = f'http://{cam_ip}/cam-hi.jpg'
+  url = f'http://{cam_ip}/cam-mid.jpg'
 
   ret = True
   while ret:

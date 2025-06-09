@@ -27,49 +27,104 @@ Live Stream
 
       <a href="/settings"><button class="btn btn-primary flex-btns custom-btn">Settings</button></a>
 
-      <!-- Nút Listen (không cần thẻ audio nữa) -->
+      <!-- Nút Listen với API HTTP -->
       <button id="listenButton" class="btn btn-primary flex-btns custom-btn">Listen</button>
 
       <a href="/"><button class="btn btn-primary flex-btns custom-btn">Exit</button></a>
     </div>
+
+    <!-- Khu vực điều khiển âm thanh, hiển thị khi nhấn Listen -->
+    <div id="audioControls" style="display: none; margin-top: 20px;">
+      <input type="range" max="1" value="0.5" min="0" id="volumeRange" step="0.1">
+      <button id="pauseBtn" class="btn btn-secondary custom-btn">Pause</button>
+      <button id="continueBtn" class="btn btn-secondary custom-btn" disabled>Continue1</button>
+    </div>
   </div>
 
-  <!-- JavaScript với Web Audio API -->
+  <!-- Thêm thư viện PCMPlayer -->
+  <script src="https://unpkg.com/pcm-player"></script>
   <script>
     document.addEventListener("DOMContentLoaded", function() {
       let isListening = false;
-      let audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      let player = null;
       let listenButton = document.getElementById("listenButton");
-      let reader;
+      let audioControls = document.getElementById("audioControls");
+      let pauseBtn = document.getElementById("pauseBtn");
+      let continueBtn = document.getElementById("continueBtn");
+      let volumeRange = document.getElementById("volumeRange");
 
-      listenButton.addEventListener("click", async function() {
+      listenButton.addEventListener("click", function() {
         if (!isListening) {
-          const response = await fetch("/audio_feed", { method: "GET" });
-          reader = response.body.getReader();
-          const processStream = async () => {
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              // Bỏ qua 44 byte header WAV
-              const audioData = value.slice(44);
-              const buffer = audioContext.createBuffer(1, audioData.length, 8000);
-              const channelData = buffer.getChannelData(0);
-              for (let i = 0; i < audioData.length; i++) {
-                channelData[i] = (audioData[i] / 128) - 1; // Chuyển 8-bit sang [-1, 1]
-              }
-              const source = audioContext.createBufferSource();
-              source.buffer = buffer;
-              source.connect(audioContext.destination);
-              source.start();
-            }
-          };
-          processStream();
+          // Khởi tạo PCMPlayer
+          player = new PCMPlayer({
+            inputCodec: 'Int16',
+            channels: 1,
+            sampleRate: 16000,
+          });
+
+          // Gọi API audio_stream từ server2.py
+          const audioUrl = 'http://192.168.1.238:8000/audio_stream'; // Thay bằng địa chỉ thực tế của server2.py
+          fetch(audioUrl, { method: 'GET', headers: { 'Accept': 'audio/x-wav' } })
+            .then(response => {
+              if (!response.ok) throw new Error('Failed to fetch audio stream');
+              const reader = response.body.getReader();
+              const pump = async () => {
+                const { value, done } = await reader.read();
+                if (done) {
+                  console.log('Audio stream ended');
+                  player.destroy();
+                  return;
+                }
+                if (value) {
+                  console.log('Received audio chunk:', value.length);
+                  player.feed(value.buffer);
+                }
+                pump();
+              };
+              pump();
+            })
+            .catch(error => {
+              console.error('Error fetching audio stream:', error);
+              listenButton.textContent = "Listen";
+              audioControls.style.display = "none";
+              isListening = false;
+              if (player) player.destroy();
+            });
+
           listenButton.textContent = "Stop Listening";
+          audioControls.style.display = "block";
         } else {
-          if (reader) reader.cancel(); // Dừng stream
+          if (player) {
+            player.destroy();
+            player = null;
+          }
           listenButton.textContent = "Listen";
+          audioControls.style.display = "none";
         }
         isListening = !isListening;
+      });
+
+      // Điều chỉnh âm lượng
+      volumeRange.addEventListener("input", function() {
+        if (player) player.volume(volumeRange.value);
+      });
+
+      // Nút Pause
+      pauseBtn.addEventListener("click", async function() {
+        if (player) {
+          await player.pause();
+          pauseBtn.disabled = true;
+          continueBtn.disabled = false;
+        }
+      });
+
+      // Nút Continue
+      continueBtn.addEventListener("click", function() {
+        if (player) {
+          player.continue();
+          pauseBtn.disabled = false;
+          continueBtn.disabled = true;
+        }
       });
     });
   </script>
